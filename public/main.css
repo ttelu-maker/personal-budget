@@ -68,7 +68,7 @@ body {
 
 .page-area {
     max-width: 768px;
-     margin: 0 auto;
+    margin: 0 auto;
     display: grid;
     grid-template-columns: 1fr;
     gap: 20px;
@@ -97,3 +97,33 @@ body {
         margin: 10px;
     }
 }
+
+/* ==================== Charts (added) ==================== */
+#myChart {
+  width: 340px !important;
+  height: 340px !important;
+  display: block;
+  margin: 0 auto;
+}
+
+#d3donut {
+  width: 100%;
+  height: 340px;
+  display: block;
+  overflow: visible; /* allow labels/lines outside pie */
+}
+
+#d3donut path.slice { stroke: #fff; stroke-width: 2px; }
+#d3donut polyline   { opacity: .35; stroke: #000; stroke-width: 1.5px; fill: none; }
+
+@media (max-width: 767px){
+  #myChart, #d3donut { height: 300px !important; }
+}
+/* Force the pie to be larger and perfectly circular */
+#myChart{
+  width: 520px !important;   /* adjust to the size you want */
+  height: 520px !important;  /* same as width */
+  display: block;
+  margin: 0 auto;
+}
+

@@ -117,6 +117,8 @@
                 <h1>Chart</h1>
                 <p>
                     <canvas id="myChart" width="400" height="400"></canvas>
+                    <!-- D3 donut SVG (no additional text) -->
+                    <svg id="d3donut" role="img" aria-label="Budget donut chart"></svg>
                 </p>
             </article>
 
@@ -131,45 +133,116 @@
         </div>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.20.0/axios.min.js" integrity="sha512-quHCp3WbBNkwLfYUMd+KwBAgpVukJu5MncuQaWXgCrfgcxCJAq/fo+oqrRKOj+UKEmyMCG3tb8RB63W+EmrOBg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.js" integrity="sha512-G8JE1Xbr0egZE5gNGyUm1fF764iHVfRXshIoUWCTPAbKkkItp/6qal5YAHXrxEu4HNfPTQs6HOu3D5vCGS1j3w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script>
-    var dataSource = {
-  datasets: [
-    {
-      data: [],
-      backgroundColor: [
-        '#ffcd56',
-        '#ff6384',
-        '#36a2eb',
-        '#fd6b19',
-      ],
-    },
-  ],
-  labels: []
-};
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.20.0/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 
-function createChart() {
-  var ctx = document.getElementById("myChart").getContext("2d");
-  var myPieChart = new Chart(ctx, {
-    type: 'pie',
-    data: dataSource
-  });
-}
+    <!-- App script: Chart.js pie + animated D3 donut (labels + lines), both from /budget -->
+    <script>
+      const SLICE_COLORS = ['#ffcd56','#ff6384','#36a2eb','#fd6b19','#4bc0c0','#9966ff','#c9cbcf'];
 
-function getBudget() {
-  axios.get('/budget')
-    .then(function (res) {
-      console.log(res);
-        for (var i = 0; i < res.data.myBudget.length; i++) {
-        dataSource.datasets[0].data[i] = res.data.myBudget[i].budget;
-        dataSource.labels[i] = res.data.myBudget[i].title;
+      /* ---------- Chart.js (pie) ---------- */
+      var dataSource = {
+        labels: [],
+        datasets: [{ data: [], backgroundColor: SLICE_COLORS }]
+      };
+
+      function createChart() {
+        var ctx = document.getElementById('myChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'pie',
+          data: dataSource,
+          options: { responsive: true, maintainAspectRatio: false }
+        });
       }
-      createChart();
-    });
-}
-getBudget();
 
-</script>
+      /* ---------- D3 DONUT (animated, labels + lines) ---------- */
+      function drawD3Donut(dataset) {
+        const svg = d3.select('#d3donut');
+        if (svg.empty()) return;
+
+        // extra room so labels don't clip
+        const baseWidth = svg.node().getBoundingClientRect().width || 600;
+        const height = 340, marginX = 80, width = baseWidth + marginX * 2;
+
+        svg.selectAll('*').remove();
+        svg.attr('width', width).attr('height', height).style('overflow', 'visible');
+
+        const radius = Math.min(baseWidth, height) / 2;
+        const g = svg.append('g').attr('transform', `translate(${width/2},${height/2})`);
+
+        const color = d3.scaleOrdinal()
+          .domain(dataset.map(d => d.title))
+          .range(SLICE_COLORS);
+
+        const pie = d3.pie().sort(null).value(d => d.budget);
+        const arc = d3.arc().outerRadius(radius * 0.80).innerRadius(radius * 0.45);
+        const outerArc = d3.arc().outerRadius(radius * 0.95).innerRadius(radius * 0.95);
+        const data_ready = pie(dataset);
+
+        // --- SLICES: sweep animation ---
+        g.append('g').attr('class','slices')
+          .selectAll('path')
+          .data(data_ready)
+          .enter().append('path')
+          .attr('class','slice')
+          .attr('fill', d => color(d.data.title))
+          .each(function(d){ this._current = {startAngle: d.startAngle, endAngle: d.startAngle}; })
+          .transition().duration(1000)
+          .attrTween('d', function(d){
+            const i = d3.interpolate(this._current, d);
+            this._current = i(1);
+            return t => arc(i(t));
+          });
+
+        function midAngle(d){ return d.startAngle + (d.endAngle - d.startAngle)/2; }
+        const labelRadius = radius * 1.05;
+        const labelPad = 6;
+
+        // --- LINES: fade/slide in after slices ---
+        g.append('g').attr('class','lines')
+          .selectAll('polyline')
+          .data(data_ready)
+          .enter().append('polyline')
+          .attr('opacity', 0)
+          .transition().delay(800).duration(600)
+          .attr('points', d => {
+            const posA = arc.centroid(d);
+            const posB = outerArc.centroid(d);
+            const posC = outerArc.centroid(d);
+            posC[0] = labelRadius * (midAngle(d) < Math.PI ? 1 : -1);
+            return [posA, posB, posC];
+          })
+          .attr('opacity', 1);
+
+        // --- LABELS: fade/slide in after slices ---
+        g.append('g').attr('class','labels')
+          .selectAll('text')
+          .data(data_ready)
+          .enter().append('text')
+          .text(d => d.data.title)
+          .attr('opacity', 0)
+          .transition().delay(800).duration(600)
+          .attr('transform', d => {
+            const pos = outerArc.centroid(d);
+            pos[0] = labelRadius * (midAngle(d) < Math.PI ? 1 : -1);
+            pos[0] += (midAngle(d) < Math.PI ? labelPad : -labelPad);
+            return `translate(${pos})`;
+          })
+          .style('text-anchor', d => (midAngle(d) < Math.PI ? 'start' : 'end'))
+          .style('font', '12px Tahoma, Arial')
+          .style('fill', '#111')
+          .attr('opacity', 1);
+      }
+
+      /* ---------- Fetch once, render both charts from /budget ---------- */
+      axios.get('/budget').then(({ data }) => {
+        dataSource.labels = data.map(d => d.title);
+        dataSource.datasets[0].data = data.map(d => d.budget);
+        createChart();        // Chart.js pie
+        drawD3Donut(data);    // D3 donut with animation
+      }).catch(console.error);
+    </script>
 </body>
 </html>
