@@ -1,17 +1,13 @@
+// Budget API
 const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const port = 3000;
 
-// Serve static files from ./public
-app.use('/', express.static('public'));
-
-// Test route
-app.get('/hello', (req, res) => {
-  res.send('Hello World!');
-});
+app.use(cors());
 
 // Load data from budget.json on demand
 app.get('/budget', (req, res) => {
@@ -27,5 +23,5 @@ app.get('/budget', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+  console.log(`API served at  listening at http://localhost:${port}`);
 });

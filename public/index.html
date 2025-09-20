@@ -237,7 +237,7 @@
       }
 
       /* ---------- Fetch once, render both charts from /budget ---------- */
-      axios.get('/budget').then(({ data }) => {
+axios.get('http://localhost:3000/budget').then(({ data }) => {
         dataSource.labels = data.map(d => d.title);
         dataSource.datasets[0].data = data.map(d => d.budget);
         createChart();        // Chart.js pie
